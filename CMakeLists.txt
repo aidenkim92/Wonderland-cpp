@@ -32,12 +32,17 @@ find_library(RAYLIB_LIBRARY NAMES raylib
 add_executable(wonderland
   src/main.cpp
   src/app/Game.cpp
+  src/sim/Level.cpp
   src/sim/Sim.cpp
   src/render/Draw.cpp
 )
 
 target_include_directories(wonderland PRIVATE src "${RAYLIB_INCLUDE_DIR}")
-target_compile_definitions(wonderland PRIVATE PLATFORM_DESKTOP GRAPHICS_API_OPENGL_33)
+target_compile_definitions(wonderland PRIVATE
+  PLATFORM_DESKTOP
+  GRAPHICS_API_OPENGL_33
+  WL_ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets"
+)
 target_link_libraries(wonderland PRIVATE "${RAYLIB_LIBRARY}")
 
 if(APPLE)
