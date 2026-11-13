@@ -27,8 +27,10 @@ bool overlap(const AABB& a, const AABB& b) {
 }
 
 bool solidAtPx(const Level& level, float px, float py) {
-  const int col = static_cast<int>(std::floor(px / static_cast<float>(level.tile)));
-  const int row = static_cast<int>(std::floor(py / static_cast<float>(level.tile)));
+  const int col =
+      static_cast<int>(std::floor(px / static_cast<float>(level.tile)));
+  const int row =
+      static_cast<int>(std::floor(py / static_cast<float>(level.tile)));
   return level.solid(col, row);
 }
 
@@ -77,8 +79,7 @@ void moveAndCollide(const Level& level, AABB& box, float& vx, float& vy,
 
 void placeOnGround(const Level& level, AABB& box) {
   const float t = static_cast<float>(level.tile);
-  // Drop from spawn until feet hit a solid.
-  for (int i = 0; i < level.rows * 2; ++i) {
+  for (int i = 0; i < level.rows * level.tile + 8; ++i) {
     const float feet = box.y + box.h;
     if (solidAtPx(level, box.x + 2.0f, feet) ||
         solidAtPx(level, box.x + box.w - 3.0f, feet)) {
@@ -88,6 +89,39 @@ void placeOnGround(const Level& level, AABB& box) {
     }
     box.y += 1.0f;
   }
+}
+
+AABB markerBox(const Level& level, int col, int row, float w, float h) {
+  const float t = static_cast<float>(level.tile);
+  AABB box{col * t + (t - w) * 0.5f, 0.0f, w, h};
+  placeOnGround(level, box);
+  return box;
+}
+
+bool touchingSpikes(const Level& level, const AABB& box) {
+  const float t = static_cast<float>(level.tile);
+  const int c0 = static_cast<int>(std::floor(box.x / t));
+  const int c1 = static_cast<int>(std::floor((box.x + box.w - 1.0f) / t));
+  const int r0 = static_cast<int>(std::floor(box.y / t));
+  const int r1 = static_cast<int>(std::floor((box.y + box.h - 1.0f) / t));
+  for (int r = r0; r <= r1; ++r) {
+    for (int c = c0; c <= c1; ++c) {
+      if (level.spike(c, r)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+void resetPlayerMotion(Player& player) {
+  player.vx = 0;
+  player.vy = 0;
+  player.grounded = true;
+  player.coyote = kCoyote;
+  player.jumpBuffer = 0;
+  player.attackCd = 0;
+  player.attackActive = 0;
 }
 
 }  // namespace
@@ -111,6 +145,14 @@ AABB Sim::attackBox() const {
   return AABB{x, player.box.y + 8.0f, w, h};
 }
 
+bool Sim::loadNamedLevel(const std::string& fileName, std::string& error) {
+  if (assetsDir.empty()) {
+    error = "assetsDir not set";
+    return false;
+  }
+  return loadFromFile(assetsDir + "/levels/" + fileName, error);
+}
+
 bool Sim::loadFromFile(const std::string& path, std::string& error) {
   Level loaded;
   if (!loadLevelFile(path, loaded, error)) {
@@ -119,31 +161,51 @@ bool Sim::loadFromFile(const std::string& path, std::string& error) {
   level = std::move(loaded);
   worldW = static_cast<float>(level.cols * level.tile);
   worldH = static_cast<float>(level.rows * level.tile);
+  pendingLevel.clear();
 
   const float tile = static_cast<float>(level.tile);
   player.box = AABB{level.spawnCol * tile + 2.0f, 0.0f, 32.0f, 32.0f};
   placeOnGround(level, player.box);
-  player.vx = 0;
-  player.vy = 0;
-  player.grounded = true;
-  player.coyote = kCoyote;
-  player.jumpBuffer = 0;
+  resetPlayerMotion(player);
   player.facing = 1;
   player.hp = player.maxHp;
   player.invuln = 0;
-  player.attackCd = 0;
-  player.attackActive = 0;
 
-  const float ex = level.enemy.col * tile;
-  const float half = static_cast<float>(std::max(1, level.enemy.patrol)) * tile;
-  enemy.alive = true;
-  enemy.box = AABB{ex, 0.0f, 28.0f, 28.0f};
-  placeOnGround(level, enemy.box);
-  enemy.vx = 40.0f;
-  enemy.minX = std::max(0.0f, ex - half);
-  enemy.maxX = std::min(worldW, ex + half + enemy.box.w);
-  enemy.hp = 2;
-  enemy.hitFlash = 0;
+  if (level.enemy.present) {
+    const float ex = level.enemy.col * tile;
+    const float half =
+        static_cast<float>(std::max(1, level.enemy.patrol)) * tile;
+    enemy.alive = true;
+    enemy.box = AABB{ex, 0.0f, 28.0f, 28.0f};
+    placeOnGround(level, enemy.box);
+    enemy.vx = 40.0f;
+    enemy.minX = std::max(0.0f, ex - half);
+    enemy.maxX = std::min(worldW, ex + half + enemy.box.w);
+    enemy.hp = 2;
+    enemy.hitFlash = 0;
+  } else {
+    enemy.alive = false;
+  }
+
+  if (level.hasCheckpoint()) {
+    checkpoint.exists = true;
+    checkpoint.active = false;
+    checkpoint.box = markerBox(level, level.checkpointCol, level.checkpointRow,
+                               20.0f, 36.0f);
+  } else {
+    checkpoint.exists = false;
+    checkpoint.active = false;
+  }
+
+  if (level.exit.valid()) {
+    exitDoor.exists = true;
+    exitDoor.to = level.exit.to;
+    exitDoor.box =
+        markerBox(level, level.exit.col, level.exit.row, 24.0f, 40.0f);
+  } else {
+    exitDoor.exists = false;
+    exitDoor.to.clear();
+  }
 
   status = level.name;
   return true;
@@ -151,20 +213,23 @@ bool Sim::loadFromFile(const std::string& path, std::string& error) {
 
 void Sim::respawnPlayer() {
   const float tile = static_cast<float>(level.tile);
-  player.box = AABB{level.spawnCol * tile + 2.0f, 0.0f, 32.0f, 32.0f};
+  if (checkpoint.exists && checkpoint.active) {
+    player.box = AABB{checkpoint.box.x + checkpoint.box.w * 0.5f - 16.0f, 0.0f,
+                      32.0f, 32.0f};
+  } else {
+    player.box = AABB{level.spawnCol * tile + 2.0f, 0.0f, 32.0f, 32.0f};
+  }
   placeOnGround(level, player.box);
-  player.vx = 0;
-  player.vy = 0;
-  player.grounded = true;
-  player.coyote = kCoyote;
-  player.jumpBuffer = 0;
+  resetPlayerMotion(player);
   player.hp = player.maxHp;
   player.invuln = 1.0f;
-  player.attackCd = 0;
-  player.attackActive = 0;
 }
 
 void Sim::fixedUpdate(float dt, const Input& input) {
+  if (!pendingLevel.empty()) {
+    return;
+  }
+
   player.invuln = std::max(0.0f, player.invuln - dt);
   player.attackCd = std::max(0.0f, player.attackCd - dt);
   player.attackActive = std::max(0.0f, player.attackActive - dt);
@@ -253,23 +318,48 @@ void Sim::fixedUpdate(float dt, const Input& input) {
     }
   }
 
-  if (enemy.alive && player.invuln <= 0.0f && overlap(player.box, enemy.box)) {
+  auto hurtPlayer = [&](const char* reason) {
+    if (player.invuln > 0.0f) {
+      return;
+    }
     player.hp -= 1;
     player.invuln = kInvuln;
+    player.vy = -120.0f;
+    if (player.hp <= 0) {
+      respawnPlayer();
+      status = reason;
+    }
+  };
+
+  if (enemy.alive && player.invuln <= 0.0f &&
+      overlap(player.box, enemy.box)) {
     player.vx =
         (player.box.x + player.box.w * 0.5f < enemy.box.x + enemy.box.w * 0.5f)
             ? -kKnock
             : kKnock;
-    player.vy = -120.0f;
-    if (player.hp <= 0) {
-      respawnPlayer();
-      status = "respawned";
+    hurtPlayer("respawned at lantern");
+  }
+
+  if (touchingSpikes(level, player.box)) {
+    hurtPlayer("spikes — rest spot");
+  }
+
+  if (checkpoint.exists && overlap(player.box, checkpoint.box)) {
+    if (!checkpoint.active) {
+      checkpoint.active = true;
+      player.hp = player.maxHp;
+      status = "lantern lit — rest saved";
     }
+  }
+
+  if (exitDoor.exists && overlap(player.box, exitDoor.box)) {
+    pendingLevel = exitDoor.to;
+    status = "entering " + exitDoor.to;
   }
 
   if (player.box.y > worldH + 64.0f) {
     respawnPlayer();
-    status = "fell — respawn";
+    status = "fell — rest spot";
   }
 }
 

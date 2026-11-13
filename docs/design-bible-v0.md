@@ -53,8 +53,8 @@ Controls (keyboard): A/D or ←/→ move, Space/W/↑ jump. Gamepad later.
 ## Content roadmap (vertical)
 
 1. **Slice 0** — window, fixed loop, player move/jump on a sunny stub meadow.
-2. **Slice 1 (now)** — tilemap load from `assets/levels/*.json`, one patrol blob, melee hitbox (F/J), HP + touch damage.
-3. **Slice 2** — checkpoint rest spot, respawn at lantern, one dungeon room.
+2. **Slice 1** — tilemap load from `assets/levels/*.json`, one patrol blob, melee hitbox (F/J), HP + touch damage.
+3. **Slice 2 (now)** — lantern checkpoint (heal + respawn), door transitions, `ruins_01` room, spike tiles (`^`).
 4. **Slice 3** — shop/inventory as data + simple UI.
 5. **Slice 4** — mid-boss state machine; then expand zones.
 
@@ -68,7 +68,7 @@ Controls (keyboard): A/D or ←/→ move, Space/W/↑ jump. Gamepad later.
 | Crystal deep | Combo geometry; palette stays saturated |
 | Final atelier | Pattern-learn boss; bright stage lighting |
 
-Rooms are authored as data (`assets/levels/*.json`). Tile `#` = solid, `.` = air. Checkpoints read as safe rest props (bench / lantern), not invisible markers.
+Rooms are authored as data (`assets/levels/*.json`). Tile `#` = solid, `^` = spike hazard, `.` = air. Optional fields: `theme`, `checkpoint`, `exit.to`. Checkpoints are lantern props — stepping on one lights it, heals, and becomes the respawn rest spot.
 
 ## Economy (later)
 

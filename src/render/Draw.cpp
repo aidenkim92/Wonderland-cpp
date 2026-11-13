@@ -4,56 +4,86 @@
 
 #include <raylib.h>
 
-#include <string>
-
 namespace wonderland {
 namespace {
 
-constexpr Color kSky{126, 200, 227, 255};
+constexpr Color kSkyMeadow{126, 200, 227, 255};
+constexpr Color kSkyRuins{186, 214, 227, 255};
 constexpr Color kGrassLight{93, 187, 99, 255};
 constexpr Color kGrassDark{61, 139, 79, 255};
 constexpr Color kStone{143, 163, 176, 255};
 constexpr Color kStoneDark{92, 107, 117, 255};
+constexpr Color kStoneWarm{168, 176, 186, 255};
 constexpr Color kPlayer{224, 122, 95, 255};
 constexpr Color kScarf{56, 142, 142, 255};
 constexpr Color kAccent{244, 193, 93, 255};
 constexpr Color kDanger{232, 90, 79, 255};
 constexpr Color kBlob{120, 196, 140, 255};
 constexpr Color kHeart{232, 90, 79, 255};
+constexpr Color kDoor{120, 92, 70, 255};
+constexpr Color kDoorLit{244, 193, 93, 255};
 
 }  // namespace
 
 void drawFrame(const Sim& sim) {
-  ClearBackground(kSky);
+  const bool ruins = sim.level.theme == "ruins";
+  ClearBackground(ruins ? kSkyRuins : kSkyMeadow);
 
-  DrawEllipse(160, static_cast<int>(sim.worldH) - 80, 180, 50,
-              Fade(kGrassDark, 0.3f));
-  DrawEllipse(420, static_cast<int>(sim.worldH) - 100, 220, 60,
-              Fade(kGrassDark, 0.25f));
+  if (!ruins) {
+    DrawEllipse(160, static_cast<int>(sim.worldH) - 80, 180, 50,
+                Fade(kGrassDark, 0.3f));
+    DrawEllipse(420, static_cast<int>(sim.worldH) - 100, 220, 60,
+                Fade(kGrassDark, 0.25f));
+  }
 
   const int t = sim.level.tile;
   for (int r = 0; r < sim.level.rows; ++r) {
     for (int c = 0; c < sim.level.cols; ++c) {
+      const int x = c * t;
+      const int y = r * t;
+      if (sim.level.spike(c, r)) {
+        DrawTriangle(Vector2{static_cast<float>(x), static_cast<float>(y + t)},
+                     Vector2{static_cast<float>(x + t), static_cast<float>(y + t)},
+                     Vector2{static_cast<float>(x + t * 0.5f),
+                             static_cast<float>(y + 2)},
+                     kDanger);
+        continue;
+      }
       if (!sim.level.solid(c, r)) {
         continue;
       }
-      const int x = c * t;
-      const int y = r * t;
-      const bool grassTop = !sim.level.solid(c, r - 1);
-      DrawRectangle(x, y, t, t, grassTop ? kGrassLight : kStone);
-      if (grassTop) {
-        DrawRectangle(x, y, t, 3, kGrassDark);
-      } else {
+      const bool topExposed = !sim.level.solid(c, r - 1);
+      if (ruins) {
+        DrawRectangle(x, y, t, t, topExposed ? kStoneWarm : kStone);
         DrawRectangle(x, y + t - 2, t, 2, kStoneDark);
+      } else {
+        DrawRectangle(x, y, t, t, topExposed ? kGrassLight : kStone);
+        if (topExposed) {
+          DrawRectangle(x, y, t, 3, kGrassDark);
+        } else {
+          DrawRectangle(x, y + t - 2, t, 2, kStoneDark);
+        }
       }
     }
   }
 
-  // Lantern prop near right side of ground
-  const int lanternX = static_cast<int>(sim.worldW) - 80;
-  const int groundY = (sim.level.rows - 3) * t;
-  DrawRectangle(lanternX, groundY - 28, 8, 28, kStoneDark);
-  DrawCircle(lanternX + 4, groundY - 34, 9, kAccent);
+  if (sim.checkpoint.exists) {
+    const auto& b = sim.checkpoint.box;
+    const int lx = static_cast<int>(b.x + b.w * 0.5f);
+    const int by = static_cast<int>(b.y + b.h);
+    DrawRectangle(lx - 3, by - 28, 6, 28, kStoneDark);
+    DrawCircle(lx, by - 34, sim.checkpoint.active ? 11 : 8,
+               sim.checkpoint.active ? kAccent : Fade(kAccent, 0.45f));
+  }
+
+  if (sim.exitDoor.exists) {
+    const auto& d = sim.exitDoor.box;
+    DrawRectangle(static_cast<int>(d.x), static_cast<int>(d.y),
+                  static_cast<int>(d.w), static_cast<int>(d.h), kDoor);
+    DrawRectangle(static_cast<int>(d.x + 4), static_cast<int>(d.y + 6),
+                  static_cast<int>(d.w - 8), static_cast<int>(d.h - 10),
+                  Fade(kDoorLit, 0.55f));
+  }
 
   if (sim.enemy.alive) {
     const auto& e = sim.enemy.box;
@@ -83,11 +113,13 @@ void drawFrame(const Sim& sim) {
 
   for (int i = 0; i < sim.player.maxHp; ++i) {
     const int hx = 16 + i * 22;
-    DrawRectangle(hx, 14, 16, 14, i < sim.player.hp ? kHeart : Fade(kHeart, 0.25f));
+    DrawRectangle(hx, 14, 16, 14,
+                  i < sim.player.hp ? kHeart : Fade(kHeart, 0.25f));
   }
 
-  DrawText("Wonderland — slice 1", 16, 36, 18, Fade(BLACK, 0.55f));
-  DrawText("A/D move · Space jump · F/J attack", 16, 56, 16, Fade(BLACK, 0.45f));
+  DrawText("Wonderland — slice 2", 16, 36, 18, Fade(BLACK, 0.55f));
+  DrawText("Lantern saves rest · Door changes room · Spikes hurt", 16, 56, 15,
+           Fade(BLACK, 0.45f));
   if (!sim.status.empty()) {
     DrawText(sim.status.c_str(), 16, 76, 16, Fade(BLACK, 0.5f));
   }

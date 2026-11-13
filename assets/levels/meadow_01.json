@@ -1,10 +1,13 @@
 {
   "name": "meadow_01",
+  "theme": "meadow",
   "tile": 16,
   "cols": 40,
   "rows": 18,
   "spawn": [3, 14],
-  "enemy": { "type": "blob", "col": 24, "row": 14, "patrol": 5 },
+  "checkpoint": [16, 14],
+  "exit": { "col": 36, "row": 14, "to": "ruins_01.json" },
+  "enemy": { "type": "blob", "col": 24, "row": 14, "patrol": 4 },
   "tiles": [
     "........................................",
     "........................................",

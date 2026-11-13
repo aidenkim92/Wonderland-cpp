@@ -92,6 +92,29 @@ bool parseIntPairAfter(const std::string& src, const std::string& key, int& a,
   return true;
 }
 
+std::string objectBlock(const std::string& src, const std::string& key) {
+  const auto pos = src.find("\"" + key + "\"");
+  if (pos == std::string::npos) {
+    return {};
+  }
+  const auto brace = src.find('{', pos);
+  if (brace == std::string::npos) {
+    return {};
+  }
+  int depth = 0;
+  for (std::size_t i = brace; i < src.size(); ++i) {
+    if (src[i] == '{') {
+      ++depth;
+    } else if (src[i] == '}') {
+      --depth;
+      if (depth == 0) {
+        return src.substr(brace, i - brace + 1);
+      }
+    }
+  }
+  return {};
+}
+
 bool parseTiles(const std::string& src, int cols, int rows,
                 std::vector<char>& cells, std::string& error) {
   const auto key = src.find("\"tiles\"");
@@ -126,8 +149,13 @@ bool parseTiles(const std::string& src, int cols, int rows,
     }
     for (int c = 0; c < cols; ++c) {
       const char ch = line[static_cast<std::size_t>(c)];
-      cells[static_cast<std::size_t>(row * cols + c)] =
-          (ch == '#') ? '#' : '.';
+      char cell = '.';
+      if (ch == '#') {
+        cell = '#';
+      } else if (ch == '^') {
+        cell = '^';
+      }
+      cells[static_cast<std::size_t>(row * cols + c)] = cell;
     }
     ++row;
     i = q2 + 1;
@@ -143,6 +171,10 @@ bool parseTiles(const std::string& src, int cols, int rows,
 
 bool Level::solid(int col, int row) const {
   return at(col, row) == '#';
+}
+
+bool Level::spike(int col, int row) const {
+  return at(col, row) == '^';
 }
 
 char Level::at(int col, int row) const {
@@ -162,6 +194,7 @@ bool loadLevelFile(const std::string& path, Level& out, std::string& error) {
   if (!parseStringAfter(src, "name", level.name)) {
     level.name = "unnamed";
   }
+  parseStringAfter(src, "theme", level.theme);
   if (!parseIntAfter(src, "tile", level.tile) || level.tile <= 0) {
     error = "invalid tile size";
     return false;
@@ -176,22 +209,28 @@ bool loadLevelFile(const std::string& path, Level& out, std::string& error) {
     error = "invalid spawn";
     return false;
   }
+  parseIntPairAfter(src, "checkpoint", level.checkpointCol,
+                    level.checkpointRow);
 
   {
-    const auto enemyPos = src.find("\"enemy\"");
-    if (enemyPos != std::string::npos) {
-      const auto brace = src.find('{', enemyPos);
-      const auto end = src.find('}', brace);
-      if (brace != std::string::npos && end != std::string::npos) {
-        const std::string block = src.substr(brace, end - brace + 1);
-        parseStringAfter(block, "type", level.enemy.type);
-        parseIntAfter(block, "col", level.enemy.col);
-        parseIntAfter(block, "row", level.enemy.row);
-        parseIntAfter(block, "patrol", level.enemy.patrol);
-      }
+    const std::string block = objectBlock(src, "exit");
+    if (!block.empty()) {
+      parseIntAfter(block, "col", level.exit.col);
+      parseIntAfter(block, "row", level.exit.row);
+      parseStringAfter(block, "to", level.exit.to);
+    }
+  }
+
+  {
+    const std::string block = objectBlock(src, "enemy");
+    if (!block.empty()) {
+      parseStringAfter(block, "type", level.enemy.type);
+      parseIntAfter(block, "col", level.enemy.col);
+      parseIntAfter(block, "row", level.enemy.row);
+      parseIntAfter(block, "patrol", level.enemy.patrol);
+      level.enemy.present = level.enemy.type != "none";
     } else {
-      level.enemy.col = level.spawnCol + 8;
-      level.enemy.row = level.spawnRow;
+      level.enemy.present = false;
     }
   }
 
