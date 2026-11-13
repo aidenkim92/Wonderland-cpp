@@ -22,18 +22,20 @@ cmake --build build
 
 If linking fails with `arm64e.x1` / malformed `.tbd` errors, the Command Line Tools SDK is ahead of your linker — the `DEVELOPER_DIR` / `SDKROOT` exports above fix that by using Xcode’s SDK.
 
-## Controls (slice 2)
+## Controls (slice 3)
 
 - **A / D** or arrows — move
 - **Space / W / ↑** — jump
 - **F / J** — melee attack
-- Touch the **lantern** to save a rest spot (heal + respawn there)
+- **E** at the stall — open shop; **1/2/3** buy; **E/Esc** close
+- Touch the **lantern** to save a rest spot
 - Walk into the **door** to change rooms (`meadow_01` ↔ `ruins_01`)
 
 ## Layout
 
 - `assets/levels` — JSON tilemaps (`meadow_01`, `ruins_01`)
+- `assets/shop` — item catalog
 - `src/app` — window + fixed-timestep loop + pixel scale
-- `src/sim` — level load, player, enemy, combat, checkpoints, exits
+- `src/sim` — level, combat, checkpoints, shop
 - `src/render` — draw current sim state
 - `docs` — design bible

@@ -33,6 +33,7 @@ add_executable(wonderland
   src/main.cpp
   src/app/Game.cpp
   src/sim/Level.cpp
+  src/sim/Shop.cpp
   src/sim/Sim.cpp
   src/render/Draw.cpp
 )

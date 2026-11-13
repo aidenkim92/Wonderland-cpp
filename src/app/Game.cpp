@@ -27,6 +27,10 @@ int Game::run() {
   sim.assetsDir = WL_ASSETS_DIR;
 
   std::string error;
+  if (!sim.loadCatalog(error)) {
+    TraceLog(LOG_ERROR, "Failed to load shop catalog: %s", error.c_str());
+    return 1;
+  }
   if (!sim.loadNamedLevel("meadow_01.json", error)) {
     TraceLog(LOG_ERROR, "Failed to load level: %s", error.c_str());
     return 1;

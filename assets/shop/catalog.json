@@ -1,0 +1,28 @@
+{
+  "items": [
+    {
+      "id": "heal",
+      "name": "Honey bun",
+      "cost": 3,
+      "effect": "heal",
+      "value": 1,
+      "once": false
+    },
+    {
+      "id": "damage",
+      "name": "Coral tonic",
+      "cost": 5,
+      "effect": "damage",
+      "value": 1,
+      "once": true
+    },
+    {
+      "id": "heart",
+      "name": "Extra heart",
+      "cost": 8,
+      "effect": "max_hp",
+      "value": 1,
+      "once": true
+    }
+  ]
+}

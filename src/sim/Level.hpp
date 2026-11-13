@@ -32,6 +32,8 @@ struct Level {
   int checkpointRow = -1;
   LevelExit exit{};
   LevelEnemySpawn enemy{};
+  int shopCol = -1;
+  int shopRow = -1;
   // row-major: '#' solid, '^' spike, '.' air
   std::vector<char> cells;
 
@@ -41,6 +43,7 @@ struct Level {
   bool hasCheckpoint() const {
     return checkpointCol >= 0 && checkpointRow >= 0;
   }
+  bool hasShop() const { return shopCol >= 0 && shopRow >= 0; }
 };
 
 bool loadLevelFile(const std::string& path, Level& out, std::string& error);

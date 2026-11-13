@@ -211,6 +211,7 @@ bool loadLevelFile(const std::string& path, Level& out, std::string& error) {
   }
   parseIntPairAfter(src, "checkpoint", level.checkpointCol,
                     level.checkpointRow);
+  parseIntPairAfter(src, "shop", level.shopCol, level.shopRow);
 
   {
     const std::string block = objectBlock(src, "exit");

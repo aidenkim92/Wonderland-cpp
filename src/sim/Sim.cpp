@@ -134,6 +134,11 @@ Input pollInput() {
       IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP);
   in.jumpHeld = IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_W) || IsKeyDown(KEY_UP);
   in.attackPressed = IsKeyPressed(KEY_F) || IsKeyPressed(KEY_J);
+  in.interactPressed = IsKeyPressed(KEY_E);
+  in.uiConfirm1 = IsKeyPressed(KEY_ONE) || IsKeyPressed(KEY_KP_1);
+  in.uiConfirm2 = IsKeyPressed(KEY_TWO) || IsKeyPressed(KEY_KP_2);
+  in.uiConfirm3 = IsKeyPressed(KEY_THREE) || IsKeyPressed(KEY_KP_3);
+  in.uiClose = IsKeyPressed(KEY_ESCAPE);
   return in;
 }
 
@@ -143,6 +148,24 @@ AABB Sim::attackBox() const {
   const float x = player.facing > 0 ? player.box.x + player.box.w - 4.0f
                                     : player.box.x - w + 4.0f;
   return AABB{x, player.box.y + 8.0f, w, h};
+}
+
+bool Sim::itemOwned(const ShopItem& item) const {
+  if (item.id == "damage") {
+    return player.boughtDamage;
+  }
+  if (item.id == "heart") {
+    return player.boughtHeart;
+  }
+  return false;
+}
+
+bool Sim::loadCatalog(std::string& error) {
+  if (assetsDir.empty()) {
+    error = "assetsDir not set";
+    return false;
+  }
+  return loadShopCatalog(assetsDir + "/shop/catalog.json", catalog, error);
 }
 
 bool Sim::loadNamedLevel(const std::string& fileName, std::string& error) {
@@ -158,17 +181,32 @@ bool Sim::loadFromFile(const std::string& path, std::string& error) {
   if (!loadLevelFile(path, loaded, error)) {
     return false;
   }
+
+  const int keepCoins = player.coins;
+  const int keepMaxHp = player.maxHp;
+  const int keepHp = player.hp;
+  const int keepAtk = player.attackPower;
+  const bool keepDmg = player.boughtDamage;
+  const bool keepHeart = player.boughtHeart;
+
   level = std::move(loaded);
   worldW = static_cast<float>(level.cols * level.tile);
   worldH = static_cast<float>(level.rows * level.tile);
   pendingLevel.clear();
+  shopOpen = false;
+  nearShop = false;
 
   const float tile = static_cast<float>(level.tile);
   player.box = AABB{level.spawnCol * tile + 2.0f, 0.0f, 32.0f, 32.0f};
   placeOnGround(level, player.box);
   resetPlayerMotion(player);
   player.facing = 1;
-  player.hp = player.maxHp;
+  player.coins = keepCoins;
+  player.maxHp = keepMaxHp;
+  player.hp = std::clamp(keepHp, 1, keepMaxHp);
+  player.attackPower = keepAtk;
+  player.boughtDamage = keepDmg;
+  player.boughtHeart = keepHeart;
   player.invuln = 0;
 
   if (level.enemy.present) {
@@ -182,6 +220,7 @@ bool Sim::loadFromFile(const std::string& path, std::string& error) {
     enemy.minX = std::max(0.0f, ex - half);
     enemy.maxX = std::min(worldW, ex + half + enemy.box.w);
     enemy.hp = 2;
+    enemy.coinDrop = 3;
     enemy.hitFlash = 0;
   } else {
     enemy.alive = false;
@@ -207,6 +246,13 @@ bool Sim::loadFromFile(const std::string& path, std::string& error) {
     exitDoor.to.clear();
   }
 
+  if (level.hasShop()) {
+    shop.exists = true;
+    shop.box = markerBox(level, level.shopCol, level.shopRow, 28.0f, 36.0f);
+  } else {
+    shop.exists = false;
+  }
+
   status = level.name;
   return true;
 }
@@ -223,10 +269,79 @@ void Sim::respawnPlayer() {
   resetPlayerMotion(player);
   player.hp = player.maxHp;
   player.invuln = 1.0f;
+  shopOpen = false;
+}
+
+bool Sim::tryBuy(std::size_t index) {
+  if (index >= catalog.items.size()) {
+    return false;
+  }
+  const ShopItem& item = catalog.items[index];
+  if (item.once && itemOwned(item)) {
+    status = item.name + " already owned";
+    return false;
+  }
+  if (player.coins < item.cost) {
+    status = "need more coins";
+    return false;
+  }
+  if (item.effect == "heal" && player.hp >= player.maxHp) {
+    status = "already full health";
+    return false;
+  }
+
+  player.coins -= item.cost;
+  if (item.effect == "heal") {
+    player.hp = std::min(player.maxHp, player.hp + item.value);
+    status = "bought " + item.name;
+  } else if (item.effect == "damage") {
+    player.attackPower += item.value;
+    player.boughtDamage = true;
+    status = "bought " + item.name + " (atk " +
+             std::to_string(player.attackPower) + ")";
+  } else if (item.effect == "max_hp") {
+    player.maxHp += item.value;
+    player.hp += item.value;
+    player.boughtHeart = true;
+    status = "bought " + item.name;
+  } else {
+    player.coins += item.cost;
+    status = "unknown item effect";
+    return false;
+  }
+  return true;
 }
 
 void Sim::fixedUpdate(float dt, const Input& input) {
   if (!pendingLevel.empty()) {
+    return;
+  }
+
+  nearShop = shop.exists && overlap(player.box, shop.box);
+
+  if (shopOpen) {
+    player.vx = 0;
+    if (input.uiClose || input.interactPressed) {
+      shopOpen = false;
+      status = "shop closed";
+      return;
+    }
+    if (input.uiConfirm1) {
+      tryBuy(0);
+    }
+    if (input.uiConfirm2) {
+      tryBuy(1);
+    }
+    if (input.uiConfirm3) {
+      tryBuy(2);
+    }
+    return;
+  }
+
+  if (nearShop && input.interactPressed) {
+    shopOpen = true;
+    status = "welcome — press 1/2/3 to buy";
+    player.vx = 0;
     return;
   }
 
@@ -308,13 +423,14 @@ void Sim::fixedUpdate(float dt, const Input& input) {
   }
 
   if (playerAttacking() && enemy.alive && overlap(attackBox(), enemy.box)) {
-    enemy.hp -= 1;
+    enemy.hp -= player.attackPower;
     enemy.hitFlash = 0.15f;
     enemy.box.x += static_cast<float>(player.facing) * 14.0f;
     player.attackActive = 0;
     if (enemy.hp <= 0) {
       enemy.alive = false;
-      status = "blob down!";
+      player.coins += enemy.coinDrop;
+      status = "blob down! +" + std::to_string(enemy.coinDrop) + " coins";
     }
   }
 

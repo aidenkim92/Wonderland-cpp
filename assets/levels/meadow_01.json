@@ -5,6 +5,7 @@
   "cols": 40,
   "rows": 18,
   "spawn": [3, 14],
+  "shop": [8, 14],
   "checkpoint": [16, 14],
   "exit": { "col": 36, "row": 14, "to": "ruins_01.json" },
   "enemy": { "type": "blob", "col": 24, "row": 14, "patrol": 4 },

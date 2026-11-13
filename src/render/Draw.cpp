@@ -4,6 +4,8 @@
 
 #include <raylib.h>
 
+#include <string>
+
 namespace wonderland {
 namespace {
 
@@ -22,6 +24,9 @@ constexpr Color kBlob{120, 196, 140, 255};
 constexpr Color kHeart{232, 90, 79, 255};
 constexpr Color kDoor{120, 92, 70, 255};
 constexpr Color kDoorLit{244, 193, 93, 255};
+constexpr Color kStall{196, 140, 92, 255};
+constexpr Color kPanel{255, 248, 230, 255};
+constexpr Color kPanelEdge{120, 92, 70, 255};
 
 }  // namespace
 
@@ -65,6 +70,16 @@ void drawFrame(const Sim& sim) {
         }
       }
     }
+  }
+
+  if (sim.shop.exists) {
+    const auto& s = sim.shop.box;
+    DrawRectangle(static_cast<int>(s.x), static_cast<int>(s.y + 8),
+                  static_cast<int>(s.w), static_cast<int>(s.h - 8), kStall);
+    DrawRectangle(static_cast<int>(s.x - 4), static_cast<int>(s.y),
+                  static_cast<int>(s.w + 8), 10, kAccent);
+    DrawCircle(static_cast<int>(s.x + s.w * 0.5f), static_cast<int>(s.y + 18),
+               5, kPlayer);
   }
 
   if (sim.checkpoint.exists) {
@@ -117,11 +132,48 @@ void drawFrame(const Sim& sim) {
                   i < sim.player.hp ? kHeart : Fade(kHeart, 0.25f));
   }
 
-  DrawText("Wonderland — slice 2", 16, 36, 18, Fade(BLACK, 0.55f));
-  DrawText("Lantern saves rest · Door changes room · Spikes hurt", 16, 56, 15,
-           Fade(BLACK, 0.45f));
+  DrawRectangle(16, 34, 14, 14, kAccent);
+  DrawText(TextFormat("x%d", sim.player.coins), 34, 34, 16, Fade(BLACK, 0.65f));
+  DrawText(TextFormat("atk %d", sim.player.attackPower), 90, 34, 16,
+           Fade(BLACK, 0.55f));
+
+  DrawText("Wonderland — slice 3", 16, 54, 18, Fade(BLACK, 0.55f));
+  if (sim.nearShop && !sim.shopOpen) {
+    DrawText("E — open stall", 16, 74, 15, Fade(BLACK, 0.55f));
+  } else {
+    DrawText("E shop · F/J attack · door travels", 16, 74, 15,
+             Fade(BLACK, 0.45f));
+  }
   if (!sim.status.empty()) {
-    DrawText(sim.status.c_str(), 16, 76, 16, Fade(BLACK, 0.5f));
+    DrawText(sim.status.c_str(), 16, 94, 15, Fade(BLACK, 0.5f));
+  }
+
+  if (sim.shopOpen) {
+    const int pw = 280;
+    const int ph = 150;
+    const int px = static_cast<int>(sim.worldW * 0.5f) - pw / 2;
+    const int py = 70;
+    DrawRectangle(px - 2, py - 2, pw + 4, ph + 4, kPanelEdge);
+    DrawRectangle(px, py, pw, ph, kPanel);
+    DrawText("Sunny Stall", px + 12, py + 10, 18, kPanelEdge);
+    DrawText(TextFormat("Coins: %d", sim.player.coins), px + 160, py + 12, 14,
+             Fade(BLACK, 0.65f));
+
+    int line = 0;
+    for (const ShopItem& item : sim.catalog.items) {
+      if (line >= 3) {
+        break;
+      }
+      const bool owned = sim.itemOwned(item);
+      const std::string label =
+          TextFormat("%d) %s  %dc%s", line + 1, item.name.c_str(), item.cost,
+                     owned ? "  [owned]" : "");
+      DrawText(label.c_str(), px + 12, py + 40 + line * 22, 15,
+               owned ? Fade(BLACK, 0.35f) : Fade(BLACK, 0.75f));
+      ++line;
+    }
+    DrawText("1/2/3 buy · E/Esc close", px + 12, py + ph - 24, 14,
+             Fade(BLACK, 0.5f));
   }
 }
 

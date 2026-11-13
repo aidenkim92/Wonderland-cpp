@@ -54,8 +54,8 @@ Controls (keyboard): A/D or ←/→ move, Space/W/↑ jump. Gamepad later.
 
 1. **Slice 0** — window, fixed loop, player move/jump on a sunny stub meadow.
 2. **Slice 1** — tilemap load from `assets/levels/*.json`, one patrol blob, melee hitbox (F/J), HP + touch damage.
-3. **Slice 2 (now)** — lantern checkpoint (heal + respawn), door transitions, `ruins_01` room, spike tiles (`^`).
-4. **Slice 3** — shop/inventory as data + simple UI.
+3. **Slice 2** — lantern checkpoint (heal + respawn), door transitions, `ruins_01` room, spike tiles (`^`).
+4. **Slice 3 (now)** — shop catalog data, coins, stall UI (heal / damage tonic / extra heart).
 5. **Slice 4** — mid-boss state machine; then expand zones.
 
 ## Level intent (field → deep)
@@ -70,9 +70,9 @@ Controls (keyboard): A/D or ←/→ move, Space/W/↑ jump. Gamepad later.
 
 Rooms are authored as data (`assets/levels/*.json`). Tile `#` = solid, `^` = spike hazard, `.` = air. Optional fields: `theme`, `checkpoint`, `exit.to`. Checkpoints are lantern props — stepping on one lights it, heals, and becomes the respawn rest spot.
 
-## Economy (later)
+## Economy (slice 3)
 
-Few clear power-ups (3–5), not deep stat sheets. Coins fund heals and one damage tier early.
+Few clear power-ups, not deep stat sheets. Start with 2 coins; blobs drop coins. Catalog in `assets/shop/catalog.json`: Honey bun (heal), Coral tonic (damage, once), Extra heart (max HP, once). Progress persists across room transitions.
 
 ## Non-goals (v0)
 
