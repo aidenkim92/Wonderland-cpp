@@ -11,6 +11,7 @@ namespace {
 
 constexpr Color kSkyMeadow{126, 200, 227, 255};
 constexpr Color kSkyRuins{186, 214, 227, 255};
+constexpr Color kSkyGrove{168, 214, 180, 255};
 constexpr Color kGrassLight{93, 187, 99, 255};
 constexpr Color kGrassDark{61, 139, 79, 255};
 constexpr Color kStone{143, 163, 176, 255};
@@ -27,14 +28,27 @@ constexpr Color kDoorLit{244, 193, 93, 255};
 constexpr Color kStall{196, 140, 92, 255};
 constexpr Color kPanel{255, 248, 230, 255};
 constexpr Color kPanelEdge{120, 92, 70, 255};
+constexpr Color kBoss{214, 140, 72, 255};
+constexpr Color kBossStun{244, 210, 120, 255};
+constexpr Color kBossShield{120, 160, 200, 255};
+
+Color skyFor(const std::string& theme) {
+  if (theme == "ruins") {
+    return kSkyRuins;
+  }
+  if (theme == "grove") {
+    return kSkyGrove;
+  }
+  return kSkyMeadow;
+}
 
 }  // namespace
 
 void drawFrame(const Sim& sim) {
-  const bool ruins = sim.level.theme == "ruins";
-  ClearBackground(ruins ? kSkyRuins : kSkyMeadow);
+  const std::string& theme = sim.level.theme;
+  ClearBackground(skyFor(theme));
 
-  if (!ruins) {
+  if (theme != "ruins") {
     DrawEllipse(160, static_cast<int>(sim.worldH) - 80, 180, 50,
                 Fade(kGrassDark, 0.3f));
     DrawEllipse(420, static_cast<int>(sim.worldH) - 100, 220, 60,
@@ -58,7 +72,7 @@ void drawFrame(const Sim& sim) {
         continue;
       }
       const bool topExposed = !sim.level.solid(c, r - 1);
-      if (ruins) {
+      if (theme == "ruins") {
         DrawRectangle(x, y, t, t, topExposed ? kStoneWarm : kStone);
         DrawRectangle(x, y + t - 2, t, 2, kStoneDark);
       } else {
@@ -97,7 +111,8 @@ void drawFrame(const Sim& sim) {
                   static_cast<int>(d.w), static_cast<int>(d.h), kDoor);
     DrawRectangle(static_cast<int>(d.x + 4), static_cast<int>(d.y + 6),
                   static_cast<int>(d.w - 8), static_cast<int>(d.h - 10),
-                  Fade(kDoorLit, 0.55f));
+                  sim.exitDoor.locked ? Fade(kDanger, 0.55f)
+                                      : Fade(kDoorLit, 0.55f));
   }
 
   if (sim.enemy.alive) {
@@ -107,6 +122,31 @@ void drawFrame(const Sim& sim) {
                   static_cast<int>(e.w), static_cast<int>(e.h), body);
     DrawCircle(static_cast<int>(e.x + 8), static_cast<int>(e.y + 10), 3, BLACK);
     DrawCircle(static_cast<int>(e.x + 18), static_cast<int>(e.y + 10), 3, BLACK);
+  }
+
+  if (sim.boss.present && sim.boss.alive) {
+    const auto& b = sim.boss.box;
+    Color body = kBoss;
+    if (sim.boss.state == BossState::Stunned) {
+      body = kBossStun;
+    } else if (sim.boss.state == BossState::WindUp ||
+               sim.boss.state == BossState::Charge) {
+      body = kBossShield;
+    }
+    if (sim.boss.hitFlash > 0) {
+      body = kDanger;
+    }
+    DrawRectangle(static_cast<int>(b.x), static_cast<int>(b.y),
+                  static_cast<int>(b.w), static_cast<int>(b.h), body);
+    DrawRectangle(static_cast<int>(b.x + 10), static_cast<int>(b.y + 12), 8, 8,
+                  BLACK);
+    DrawRectangle(static_cast<int>(b.x + b.w - 18), static_cast<int>(b.y + 12),
+                  8, 8, BLACK);
+    if (sim.boss.state == BossState::WindUp) {
+      const float tipX = sim.boss.facing > 0 ? b.x + b.w + 12 : b.x - 12;
+      DrawCircle(static_cast<int>(tipX), static_cast<int>(b.y + 20), 6,
+                 Fade(kDanger, 0.8f));
+    }
   }
 
   const bool blink = sim.player.invuln > 0.0f &&
@@ -137,9 +177,23 @@ void drawFrame(const Sim& sim) {
   DrawText(TextFormat("atk %d", sim.player.attackPower), 90, 34, 16,
            Fade(BLACK, 0.55f));
 
-  DrawText("Wonderland — slice 3", 16, 54, 18, Fade(BLACK, 0.55f));
+  if (sim.boss.present && sim.boss.alive) {
+    const int barW = 160;
+    const int barX = static_cast<int>(sim.worldW) - barW - 16;
+    DrawRectangle(barX, 14, barW, 12, Fade(BLACK, 0.25f));
+    const float pct =
+        static_cast<float>(sim.boss.hp) / static_cast<float>(sim.boss.maxHp);
+    DrawRectangle(barX, 14, static_cast<int>(barW * pct), 12, kBoss);
+    DrawText(TextFormat("Brute [%s]", sim.boss.stateName()), barX, 30, 14,
+             Fade(BLACK, 0.55f));
+  }
+
+  DrawText("Wonderland — slice 4", 16, 54, 18, Fade(BLACK, 0.55f));
   if (sim.nearShop && !sim.shopOpen) {
     DrawText("E — open stall", 16, 74, 15, Fade(BLACK, 0.55f));
+  } else if (sim.boss.present && sim.boss.alive) {
+    DrawText("Boss: dodge charge, strike while gold/stunned", 16, 74, 14,
+             Fade(BLACK, 0.5f));
   } else {
     DrawText("E shop · F/J attack · door travels", 16, 74, 15,
              Fade(BLACK, 0.45f));

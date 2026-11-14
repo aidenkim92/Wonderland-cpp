@@ -1,10 +1,11 @@
 #pragma once
 
+#include "sim/Boss.hpp"
+#include "sim/Geom.hpp"
 #include "sim/Level.hpp"
 #include "sim/Shop.hpp"
 
 #include <string>
-#include <vector>
 
 namespace wonderland {
 
@@ -22,13 +23,6 @@ struct Input {
 };
 
 Input pollInput();
-
-struct AABB {
-  float x = 0;
-  float y = 0;
-  float w = 0;
-  float h = 0;
-};
 
 struct Player {
   AABB box{0, 0, 32, 32};
@@ -68,6 +62,7 @@ struct Checkpoint {
 
 struct ExitDoor {
   bool exists = false;
+  bool locked = false;
   AABB box{0, 0, 24, 40};
   std::string to;
 };
@@ -82,6 +77,7 @@ struct Sim {
   Level level;
   Player player;
   Enemy enemy;
+  Boss boss;
   Checkpoint checkpoint;
   ExitDoor exitDoor;
   ShopStall shop;

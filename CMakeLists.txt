@@ -32,6 +32,7 @@ find_library(RAYLIB_LIBRARY NAMES raylib
 add_executable(wonderland
   src/main.cpp
   src/app/Game.cpp
+  src/sim/Boss.cpp
   src/sim/Level.cpp
   src/sim/Shop.cpp
   src/sim/Sim.cpp

@@ -235,6 +235,18 @@ bool loadLevelFile(const std::string& path, Level& out, std::string& error) {
     }
   }
 
+  {
+    const std::string block = objectBlock(src, "boss");
+    if (!block.empty()) {
+      parseStringAfter(block, "type", level.boss.type);
+      parseIntAfter(block, "col", level.boss.col);
+      parseIntAfter(block, "row", level.boss.row);
+      level.boss.present = level.boss.type != "none";
+    } else {
+      level.boss.present = false;
+    }
+  }
+
   if (!parseTiles(src, level.cols, level.rows, level.cells, error)) {
     return false;
   }

@@ -21,11 +21,6 @@ constexpr float kAttackActive = 0.12f;
 constexpr float kInvuln = 0.8f;
 constexpr float kKnock = 160.0f;
 
-bool overlap(const AABB& a, const AABB& b) {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h &&
-         a.y + a.h > b.y;
-}
-
 bool solidAtPx(const Level& level, float px, float py) {
   const int col =
       static_cast<int>(std::floor(px / static_cast<float>(level.tile)));
@@ -246,6 +241,14 @@ bool Sim::loadFromFile(const std::string& path, std::string& error) {
     exitDoor.to.clear();
   }
 
+  if (level.boss.present) {
+    boss.spawn(level, level.boss.col, level.boss.row, worldW);
+    exitDoor.locked = true;
+  } else {
+    boss = Boss{};
+    exitDoor.locked = false;
+  }
+
   if (level.hasShop()) {
     shop.exists = true;
     shop.box = markerBox(level, level.shopCol, level.shopRow, 28.0f, 36.0f);
@@ -254,6 +257,9 @@ bool Sim::loadFromFile(const std::string& path, std::string& error) {
   }
 
   status = level.name;
+  if (boss.present) {
+    status = "grove brute — hit only while stunned";
+  }
   return true;
 }
 
@@ -422,6 +428,10 @@ void Sim::fixedUpdate(float dt, const Input& input) {
     }
   }
 
+  if (boss.present && boss.alive) {
+    boss.fixedUpdate(dt, level, player);
+  }
+
   if (playerAttacking() && enemy.alive && overlap(attackBox(), enemy.box)) {
     enemy.hp -= player.attackPower;
     enemy.hitFlash = 0.15f;
@@ -431,6 +441,22 @@ void Sim::fixedUpdate(float dt, const Input& input) {
       enemy.alive = false;
       player.coins += enemy.coinDrop;
       status = "blob down! +" + std::to_string(enemy.coinDrop) + " coins";
+    }
+  }
+
+  if (playerAttacking() && boss.present && boss.alive &&
+      overlap(attackBox(), boss.box)) {
+    player.attackActive = 0;
+    if (boss.tryMeleeHit(player.attackPower, player.facing)) {
+      status = std::string("hit! ") + boss.stateName();
+      if (!boss.alive) {
+        player.coins += boss.coinDrop;
+        exitDoor.locked = false;
+        status = "brute down! door unlocked +" +
+                 std::to_string(boss.coinDrop) + "c";
+      }
+    } else {
+      status = "blocked — wait for stun";
     }
   }
 
@@ -456,6 +482,15 @@ void Sim::fixedUpdate(float dt, const Input& input) {
     hurtPlayer("respawned at lantern");
   }
 
+  if (boss.present && boss.alive && player.invuln <= 0.0f &&
+      overlap(player.box, boss.box)) {
+    player.vx =
+        (player.box.x + player.box.w * 0.5f < boss.box.x + boss.box.w * 0.5f)
+            ? -kKnock
+            : kKnock;
+    hurtPlayer("bruised — lantern rest");
+  }
+
   if (touchingSpikes(level, player.box)) {
     hurtPlayer("spikes — rest spot");
   }
@@ -469,8 +504,12 @@ void Sim::fixedUpdate(float dt, const Input& input) {
   }
 
   if (exitDoor.exists && overlap(player.box, exitDoor.box)) {
-    pendingLevel = exitDoor.to;
-    status = "entering " + exitDoor.to;
+    if (exitDoor.locked) {
+      status = "door sealed until the brute falls";
+    } else {
+      pendingLevel = exitDoor.to;
+      status = "entering " + exitDoor.to;
+    }
   }
 
   if (player.box.y > worldH + 64.0f) {

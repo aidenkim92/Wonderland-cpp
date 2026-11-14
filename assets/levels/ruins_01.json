@@ -6,7 +6,7 @@
   "rows": 18,
   "spawn": [2, 14],
   "checkpoint": [10, 14],
-  "exit": { "col": 36, "row": 14, "to": "meadow_01.json" },
+  "exit": { "col": 36, "row": 14, "to": "grove_01.json" },
   "enemy": { "type": "blob", "col": 22, "row": 14, "patrol": 3 },
   "tiles": [
     "########################################",

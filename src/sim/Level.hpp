@@ -13,6 +13,13 @@ struct LevelEnemySpawn {
   bool present = true;
 };
 
+struct LevelBossSpawn {
+  std::string type = "grove_brute";
+  int col = 0;
+  int row = 0;
+  bool present = false;
+};
+
 struct LevelExit {
   int col = -1;
   int row = -1;
@@ -32,6 +39,7 @@ struct Level {
   int checkpointRow = -1;
   LevelExit exit{};
   LevelEnemySpawn enemy{};
+  LevelBossSpawn boss{};
   int shopCol = -1;
   int shopRow = -1;
   // row-major: '#' solid, '^' spike, '.' air
