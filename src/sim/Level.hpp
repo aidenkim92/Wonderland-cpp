@@ -20,6 +20,15 @@ struct LevelBossSpawn {
   bool present = false;
 };
 
+struct LevelPlatformSpawn {
+  int col = 0;
+  int row = 0;
+  int w = 3;  // tiles wide
+  int minCol = 0;
+  int maxCol = 0;
+  float speed = 40;
+};
+
 struct LevelExit {
   int col = -1;
   int row = -1;
@@ -40,6 +49,7 @@ struct Level {
   LevelExit exit{};
   LevelEnemySpawn enemy{};
   LevelBossSpawn boss{};
+  std::vector<LevelPlatformSpawn> platforms;
   int shopCol = -1;
   int shopRow = -1;
   // row-major: '#' solid, '^' spike, '.' air

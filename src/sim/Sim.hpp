@@ -6,6 +6,7 @@
 #include "sim/Shop.hpp"
 
 #include <string>
+#include <vector>
 
 namespace wonderland {
 
@@ -72,6 +73,13 @@ struct ShopStall {
   AABB box{0, 0, 28, 36};
 };
 
+struct MovingPlatform {
+  AABB box{0, 0, 48, 12};
+  float vx = 40;
+  float minX = 0;
+  float maxX = 0;
+};
+
 struct Sim {
   std::string assetsDir;
   Level level;
@@ -81,6 +89,7 @@ struct Sim {
   Checkpoint checkpoint;
   ExitDoor exitDoor;
   ShopStall shop;
+  std::vector<MovingPlatform> platforms;
   ShopCatalog catalog;
   bool shopOpen = false;
   bool nearShop = false;

@@ -56,7 +56,8 @@ Controls (keyboard): A/D or ←/→ move, Space/W/↑ jump. Gamepad later.
 2. **Slice 1** — tilemap load from `assets/levels/*.json`, one patrol blob, melee hitbox (F/J), HP + touch damage.
 3. **Slice 2** — lantern checkpoint (heal + respawn), door transitions, `ruins_01` room, spike tiles (`^`).
 4. **Slice 3** — shop catalog data, coins, stall UI (heal / damage tonic / extra heart).
-5. **Slice 4 (now)** — mid-boss grove (`grove_01`), Grove Brute state machine, stun-only vulnerability.
+5. **Slice 4** — mid-boss grove (`grove_01`), Grove Brute state machine, stun-only vulnerability.
+6. **Slice 5 (now)** — crystal deep (`crystal_01`), moving platforms, combo geometry route after the brute.
 
 ## Level intent (field → deep)
 
@@ -65,10 +66,10 @@ Controls (keyboard): A/D or ←/→ move, Space/W/↑ jump. Gamepad later.
 | Prologue meadow | Move, jump, fall hurt optional; no real enemies |
 | Sunken ruins 1 | Spikes + one moving platform; bright interiors |
 | Mid-boss grove | Grove Brute: dodge charge, strike only while stunned |
-| Crystal deep | Combo geometry; palette stays saturated |
+| Crystal deep | Moving pads + spike pits; saturated cyan crystal palette |
 | Final atelier | Pattern-learn boss; bright stage lighting |
 
-Rooms are authored as data (`assets/levels/*.json`). Tile `#` = solid, `^` = spike hazard, `.` = air. Optional fields: `theme`, `checkpoint`, `shop`, `exit.to`, `boss`. Checkpoints are lantern props. Boss rooms lock the exit until the boss is down. Brute cycle: Idle → WindUp → Charge → Recover → Stunned (vulnerable) → Idle.
+Rooms are authored as data (`assets/levels/*.json`). Tile `#` = solid, `^` = spike hazard, `.` = air. Optional fields: `theme`, `checkpoint`, `shop`, `exit.to`, `boss`, `platforms[]`. Checkpoints are lantern props. Boss rooms lock the exit until the boss is down. Brute cycle: Idle → WindUp → Charge → Recover → Stunned (vulnerable) → Idle. Path: meadow → ruins → grove → crystal → meadow.
 
 ## Economy (slice 3)
 

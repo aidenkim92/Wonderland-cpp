@@ -247,6 +247,47 @@ bool loadLevelFile(const std::string& path, Level& out, std::string& error) {
     }
   }
 
+  {
+    const auto key = src.find("\"platforms\"");
+    if (key != std::string::npos) {
+      const auto lb = src.find('[', key);
+      const auto rb = src.find(']', lb);
+      if (lb != std::string::npos && rb != std::string::npos) {
+        std::size_t search = lb + 1;
+        while (search < rb) {
+          const auto brace = src.find('{', search);
+          if (brace == std::string::npos || brace >= rb) {
+            break;
+          }
+          const auto end = src.find('}', brace);
+          if (end == std::string::npos || end > rb) {
+            break;
+          }
+          const std::string block = src.substr(brace, end - brace + 1);
+          search = end + 1;
+          LevelPlatformSpawn plat;
+          parseIntAfter(block, "col", plat.col);
+          parseIntAfter(block, "row", plat.row);
+          parseIntAfter(block, "w", plat.w);
+          parseIntAfter(block, "min_col", plat.minCol);
+          parseIntAfter(block, "max_col", plat.maxCol);
+          int speedInt = 40;
+          if (parseIntAfter(block, "speed", speedInt)) {
+            plat.speed = static_cast<float>(speedInt);
+          }
+          if (plat.w <= 0) {
+            plat.w = 3;
+          }
+          if (plat.maxCol <= plat.minCol) {
+            plat.minCol = plat.col - 2;
+            plat.maxCol = plat.col + 4;
+          }
+          level.platforms.push_back(plat);
+        }
+      }
+    }
+  }
+
   if (!parseTiles(src, level.cols, level.rows, level.cells, error)) {
     return false;
   }

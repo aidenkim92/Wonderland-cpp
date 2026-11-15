@@ -6,7 +6,7 @@
   "rows": 18,
   "spawn": [3, 14],
   "checkpoint": [6, 14],
-  "exit": { "col": 36, "row": 14, "to": "meadow_01.json" },
+  "exit": { "col": 36, "row": 14, "to": "crystal_01.json" },
   "enemy": { "type": "none" },
   "boss": { "type": "grove_brute", "col": 22, "row": 14 },
   "tiles": [

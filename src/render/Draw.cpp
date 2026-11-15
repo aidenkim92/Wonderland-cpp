@@ -12,11 +12,15 @@ namespace {
 constexpr Color kSkyMeadow{126, 200, 227, 255};
 constexpr Color kSkyRuins{186, 214, 227, 255};
 constexpr Color kSkyGrove{168, 214, 180, 255};
+constexpr Color kSkyCrystal{190, 230, 240, 255};
 constexpr Color kGrassLight{93, 187, 99, 255};
 constexpr Color kGrassDark{61, 139, 79, 255};
 constexpr Color kStone{143, 163, 176, 255};
 constexpr Color kStoneDark{92, 107, 117, 255};
 constexpr Color kStoneWarm{168, 176, 186, 255};
+constexpr Color kCrystal{110, 198, 210, 255};
+constexpr Color kCrystalHi{170, 230, 236, 255};
+constexpr Color kPad{90, 170, 200, 255};
 constexpr Color kPlayer{224, 122, 95, 255};
 constexpr Color kScarf{56, 142, 142, 255};
 constexpr Color kAccent{244, 193, 93, 255};
@@ -38,6 +42,9 @@ Color skyFor(const std::string& theme) {
   }
   if (theme == "grove") {
     return kSkyGrove;
+  }
+  if (theme == "crystal") {
+    return kSkyCrystal;
   }
   return kSkyMeadow;
 }
@@ -75,6 +82,9 @@ void drawFrame(const Sim& sim) {
       if (theme == "ruins") {
         DrawRectangle(x, y, t, t, topExposed ? kStoneWarm : kStone);
         DrawRectangle(x, y + t - 2, t, 2, kStoneDark);
+      } else if (theme == "crystal") {
+        DrawRectangle(x, y, t, t, topExposed ? kCrystalHi : kCrystal);
+        DrawRectangle(x, y, t, 3, Fade(WHITE, 0.35f));
       } else {
         DrawRectangle(x, y, t, t, topExposed ? kGrassLight : kStone);
         if (topExposed) {
@@ -84,6 +94,14 @@ void drawFrame(const Sim& sim) {
         }
       }
     }
+  }
+
+  for (const MovingPlatform& plat : sim.platforms) {
+    DrawRectangle(static_cast<int>(plat.box.x), static_cast<int>(plat.box.y),
+                  static_cast<int>(plat.box.w), static_cast<int>(plat.box.h),
+                  kPad);
+    DrawRectangle(static_cast<int>(plat.box.x), static_cast<int>(plat.box.y),
+                  static_cast<int>(plat.box.w), 3, kCrystalHi);
   }
 
   if (sim.shop.exists) {
@@ -188,12 +206,15 @@ void drawFrame(const Sim& sim) {
              Fade(BLACK, 0.55f));
   }
 
-  DrawText("Wonderland — slice 4", 16, 54, 18, Fade(BLACK, 0.55f));
+  DrawText("Wonderland — slice 5", 16, 54, 18, Fade(BLACK, 0.55f));
   if (sim.nearShop && !sim.shopOpen) {
     DrawText("E — open stall", 16, 74, 15, Fade(BLACK, 0.55f));
   } else if (sim.boss.present && sim.boss.alive) {
     DrawText("Boss: dodge charge, strike while gold/stunned", 16, 74, 14,
              Fade(BLACK, 0.5f));
+  } else if (!sim.platforms.empty()) {
+    DrawText("Ride cyan pads · watch spikes · door on the high ledge", 16, 74,
+             14, Fade(BLACK, 0.5f));
   } else {
     DrawText("E shop · F/J attack · door travels", 16, 74, 15,
              Fade(BLACK, 0.45f));

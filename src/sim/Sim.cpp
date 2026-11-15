@@ -88,9 +88,21 @@ void placeOnGround(const Level& level, AABB& box) {
 
 AABB markerBox(const Level& level, int col, int row, float w, float h) {
   const float t = static_cast<float>(level.tile);
-  AABB box{col * t + (t - w) * 0.5f, 0.0f, w, h};
-  placeOnGround(level, box);
+  AABB box{col * t + (t - w) * 0.5f, static_cast<float>(row) * t - h, w, h};
+  // Prefer the authored row if feet already meet solid; otherwise drop.
+  const float feet = box.y + box.h;
+  if (!(solidAtPx(level, box.x + 2.0f, feet) ||
+        solidAtPx(level, box.x + box.w - 3.0f, feet))) {
+    box.y = 0.0f;
+    placeOnGround(level, box);
+  }
   return box;
+}
+
+bool standingOn(const AABB& rider, const AABB& plat, float slop = 5.0f) {
+  const float feet = rider.y + rider.h;
+  return rider.x + rider.w > plat.x + 2.0f && rider.x < plat.x + plat.w - 2.0f &&
+         feet >= plat.y - slop && feet <= plat.y + slop;
 }
 
 bool touchingSpikes(const Level& level, const AABB& box) {
@@ -256,9 +268,22 @@ bool Sim::loadFromFile(const std::string& path, std::string& error) {
     shop.exists = false;
   }
 
+  platforms.clear();
+  for (const LevelPlatformSpawn& spawn : level.platforms) {
+    MovingPlatform plat;
+    const float t = tile;
+    plat.box = AABB{spawn.col * t, spawn.row * t, spawn.w * t, 12.0f};
+    plat.minX = spawn.minCol * t;
+    plat.maxX = spawn.maxCol * t + spawn.w * t;
+    plat.vx = spawn.speed;
+    platforms.push_back(plat);
+  }
+
   status = level.name;
   if (boss.present) {
     status = "grove brute — hit only while stunned";
+  } else if (!platforms.empty()) {
+    status = "crystal deep — ride the pads";
   }
   return true;
 }
@@ -406,6 +431,34 @@ void Sim::fixedUpdate(float dt, const Input& input) {
 
   player.vy += kGravity * dt;
   moveAndCollide(level, player.box, player.vx, player.vy, dt, player.grounded);
+
+  for (MovingPlatform& plat : platforms) {
+    const float prevX = plat.box.x;
+    const bool riding =
+        player.grounded && standingOn(player.box, plat.box) && player.vy >= 0.0f;
+
+    plat.box.x += plat.vx * dt;
+    if (plat.box.x < plat.minX) {
+      plat.box.x = plat.minX;
+      plat.vx = std::fabs(plat.vx);
+    } else if (plat.box.x + plat.box.w > plat.maxX) {
+      plat.box.x = plat.maxX - plat.box.w;
+      plat.vx = -std::fabs(plat.vx);
+    }
+    const float dx = plat.box.x - prevX;
+
+    // Land on / stick to moving pads.
+    if (player.vy >= 0.0f && standingOn(player.box, plat.box, 8.0f)) {
+      player.box.y = plat.box.y - player.box.h;
+      player.vy = 0;
+      player.grounded = true;
+      player.box.x += dx;
+    } else if (riding) {
+      player.box.x += dx;
+      player.box.y = plat.box.y - player.box.h;
+      player.grounded = true;
+    }
+  }
 
   if (enemy.alive) {
     float zero = 0.0f;
