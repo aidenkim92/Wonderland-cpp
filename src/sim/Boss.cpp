@@ -16,6 +16,17 @@ constexpr float kChargeSpeed = 220.0f;
 constexpr float kRecoverTime = 0.25f;
 constexpr float kStunTime = 1.6f;
 
+constexpr float kMuseIdle = 0.85f;
+constexpr float kMuseIdleFast = 0.55f;
+constexpr float kHopWind = 0.4f;
+constexpr float kHopTime = 0.55f;
+constexpr float kSlamWind = 0.5f;
+constexpr float kSlamTime = 0.35f;
+constexpr float kShootWind = 0.45f;
+constexpr float kShootTime = 0.9f;
+constexpr float kOpenTime = 1.4f;
+constexpr float kOpenTimeFast = 1.0f;
+
 bool solidAtPx(const Level& level, float px, float py) {
   const int col =
       static_cast<int>(std::floor(px / static_cast<float>(level.tile)));
@@ -81,29 +92,71 @@ void moveAndCollide(const Level& level, AABB& box, float& vx, float& vy,
 void enter(Boss& boss, BossState next, float duration) {
   boss.state = next;
   boss.timer = duration;
-  boss.vx = 0;
+  if (next != BossState::Hop && next != BossState::Charge) {
+    boss.vx = 0;
+  }
+}
+
+void updatePhase(Boss& boss) {
+  const int next = (boss.hp * 2 <= boss.maxHp) ? 2 : 1;
+  if (next != boss.phase) {
+    boss.phase = next;
+  }
+}
+
+void pickMusePattern(Boss& boss) {
+  updatePhase(boss);
+  // Rotate hop → slam → shoot.
+  if (boss.pattern % 3 == 0) {
+    enter(boss, BossState::HopWindUp, kHopWind);
+  } else if (boss.pattern % 3 == 1) {
+    enter(boss, BossState::SlamWindUp, kSlamWind);
+  } else {
+    enter(boss, BossState::ShootWindUp, kShootWind);
+  }
+  ++boss.pattern;
 }
 
 }  // namespace
 
-void Boss::spawn(const Level& level, int col, int row, float worldW) {
+void Boss::spawn(const Level& level, int col, int row, float worldW,
+                 const std::string& bossType) {
   (void)row;
   present = true;
   alive = true;
-  type = "grove_brute";
+  type = bossType.empty() ? "grove_brute" : bossType;
+  if (isMuse()) {
+    maxHp = 12;
+    coinDrop = 15;
+    box = AABB{0, 0, 40, 52};
+  } else {
+    maxHp = 8;
+    coinDrop = 10;
+    box = AABB{0, 0, 48, 48};
+  }
   hp = maxHp;
   const float tile = static_cast<float>(level.tile);
-  box = AABB{col * tile, 0.0f, 48.0f, 48.0f};
+  box.x = col * tile;
+  box.y = 0.0f;
   placeOnGround(level, box);
   facing = -1;
   arenaMinX = tile * 2.0f;
   arenaMaxX = worldW - tile * 2.0f;
   hitFlash = 0;
-  enter(*this, BossState::Idle, kIdleTime);
+  shootCd = 0;
+  pattern = 0;
+  phase = 1;
+  pendingSlam = false;
+  fireRequest = 0;
+  enter(*this, BossState::Idle, isMuse() ? kMuseIdle : kIdleTime);
 }
 
 bool Boss::invulnerable() const {
   return state != BossState::Stunned && state != BossState::Dead;
+}
+
+const char* Boss::displayName() const {
+  return isMuse() ? "Muse" : "Brute";
 }
 
 const char* Boss::stateName() const {
@@ -117,9 +170,21 @@ const char* Boss::stateName() const {
     case BossState::Recover:
       return "recover";
     case BossState::Stunned:
-      return "stunned";
+      return isMuse() ? "open" : "stunned";
     case BossState::Dead:
       return "down";
+    case BossState::HopWindUp:
+      return "hop-wind";
+    case BossState::Hop:
+      return "hop";
+    case BossState::SlamWindUp:
+      return "slam-wind";
+    case BossState::Slam:
+      return "slam";
+    case BossState::ShootWindUp:
+      return "ink-wind";
+    case BossState::Shoot:
+      return "ink";
   }
   return "?";
 }
@@ -135,6 +200,7 @@ bool Boss::tryMeleeHit(int damage, int hitFacing) {
   }
   hp -= damage;
   hitFlash = 0.2f;
+  updatePhase(*this);
   if (hp <= 0) {
     hp = 0;
     alive = false;
@@ -151,10 +217,109 @@ void Boss::fixedUpdate(float dt, const Level& level, const Player& player) {
 
   hitFlash = std::max(0.0f, hitFlash - dt);
   timer = std::max(0.0f, timer - dt);
+  shootCd = std::max(0.0f, shootCd - dt);
+  fireRequest = 0;
+  pendingSlam = false;
 
   const float playerCx = player.box.x + player.box.w * 0.5f;
   const float bossCx = box.x + box.w * 0.5f;
+  const float openTime = phase >= 2 ? kOpenTimeFast : kOpenTime;
+  const float idleTime = isMuse() ? (phase >= 2 ? kMuseIdleFast : kMuseIdle)
+                                  : kIdleTime;
 
+  if (isMuse()) {
+    switch (state) {
+      case BossState::Idle:
+        facing = playerCx < bossCx ? -1 : 1;
+        vx = 0;
+        if (timer <= 0.0f) {
+          pickMusePattern(*this);
+        }
+        break;
+
+      case BossState::HopWindUp:
+        facing = playerCx < bossCx ? -1 : 1;
+        if (timer <= 0.0f) {
+          enter(*this, BossState::Hop, kHopTime);
+          vx = static_cast<float>(facing) * 140.0f;
+          vy = -280.0f;
+        }
+        break;
+
+      case BossState::Hop: {
+        vy += kGravity * dt;
+        moveAndCollide(level, box, vx, vy, dt);
+        if (box.x < arenaMinX) {
+          box.x = arenaMinX;
+          vx = 0;
+        }
+        if (box.x + box.w > arenaMaxX) {
+          box.x = arenaMaxX - box.w;
+          vx = 0;
+        }
+        if (timer <= 0.0f) {
+          enter(*this, BossState::Idle, idleTime);
+        }
+        break;
+      }
+
+      case BossState::SlamWindUp:
+        facing = playerCx < bossCx ? -1 : 1;
+        if (timer <= 0.0f) {
+          enter(*this, BossState::Slam, kSlamTime);
+          pendingSlam = true;
+        }
+        break;
+
+      case BossState::Slam:
+        if (timer <= 0.0f) {
+          enter(*this, BossState::Stunned, openTime);
+        }
+        break;
+
+      case BossState::ShootWindUp:
+        facing = playerCx < bossCx ? -1 : 1;
+        if (timer <= 0.0f) {
+          enter(*this, BossState::Shoot, kShootTime);
+          shootCd = 0.0f;
+        }
+        break;
+
+      case BossState::Shoot:
+        if (shootCd <= 0.0f) {
+          fireRequest = 1;
+          shootCd = phase >= 2 ? 0.22f : 0.32f;
+        }
+        if (timer <= 0.0f) {
+          enter(*this, BossState::Stunned, openTime);
+        }
+        break;
+
+      case BossState::Stunned:
+        vx = 0;
+        if (timer <= 0.0f) {
+          enter(*this, BossState::Idle, idleTime);
+        }
+        break;
+
+      case BossState::Dead:
+        vx = 0;
+        break;
+
+      default:
+        enter(*this, BossState::Idle, idleTime);
+        break;
+    }
+
+    if (state != BossState::Hop) {
+      float zero = 0.0f;
+      float fall = kGravity * dt;
+      moveAndCollide(level, box, zero, fall, dt);
+    }
+    return;
+  }
+
+  // Grove brute
   switch (state) {
     case BossState::Idle:
       facing = playerCx < bossCx ? -1 : 1;
@@ -209,9 +374,12 @@ void Boss::fixedUpdate(float dt, const Level& level, const Player& player) {
     case BossState::Dead:
       vx = 0;
       break;
+
+    default:
+      enter(*this, BossState::Idle, kIdleTime);
+      break;
   }
 
-  // Keep feet planted.
   float zero = 0.0f;
   float fall = kGravity * dt;
   moveAndCollide(level, box, zero, fall, dt);

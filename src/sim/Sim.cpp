@@ -253,8 +253,11 @@ bool Sim::loadFromFile(const std::string& path, std::string& error) {
     exitDoor.to.clear();
   }
 
+  projectiles.clear();
+  slam = SlamHazard{};
+
   if (level.boss.present) {
-    boss.spawn(level, level.boss.col, level.boss.row, worldW);
+    boss.spawn(level, level.boss.col, level.boss.row, worldW, level.boss.type);
     exitDoor.locked = true;
   } else {
     boss = Boss{};
@@ -280,7 +283,9 @@ bool Sim::loadFromFile(const std::string& path, std::string& error) {
   }
 
   status = level.name;
-  if (boss.present) {
+  if (boss.present && boss.isMuse()) {
+    status = "atelier muse — learn hop/slam/ink, strike when open";
+  } else if (boss.present) {
     status = "grove brute — hit only while stunned";
   } else if (!platforms.empty()) {
     status = "crystal deep — ride the pads";
@@ -483,6 +488,43 @@ void Sim::fixedUpdate(float dt, const Input& input) {
 
   if (boss.present && boss.alive) {
     boss.fixedUpdate(dt, level, player);
+    if (boss.pendingSlam) {
+      slam.active = true;
+      slam.life = 0.45f;
+      slam.box = AABB{boss.box.x + boss.box.w * 0.5f - 50.0f,
+                      boss.box.y + boss.box.h - 8.0f, 100.0f, 18.0f};
+    }
+    if (boss.fireRequest > 0) {
+      Projectile ink;
+      ink.alive = true;
+      ink.box = AABB{boss.box.x + boss.box.w * 0.5f - 5.0f,
+                     boss.box.y + 18.0f, 10.0f, 10.0f};
+      const float dir = static_cast<float>(boss.facing);
+      ink.vx = dir * (boss.phase >= 2 ? 190.0f : 150.0f);
+      ink.vy = 0.0f;
+      ink.life = 2.2f;
+      projectiles.push_back(ink);
+    }
+  }
+
+  if (slam.active) {
+    slam.life -= dt;
+    if (slam.life <= 0.0f) {
+      slam.active = false;
+    }
+  }
+
+  for (Projectile& shot : projectiles) {
+    if (!shot.alive) {
+      continue;
+    }
+    shot.life -= dt;
+    shot.box.x += shot.vx * dt;
+    shot.box.y += shot.vy * dt;
+    if (shot.life <= 0.0f || shot.box.x < -32.0f ||
+        shot.box.x > worldW + 32.0f) {
+      shot.alive = false;
+    }
   }
 
   if (playerAttacking() && enemy.alive && overlap(attackBox(), enemy.box)) {
@@ -542,6 +584,19 @@ void Sim::fixedUpdate(float dt, const Input& input) {
             ? -kKnock
             : kKnock;
     hurtPlayer("bruised — lantern rest");
+  }
+
+  if (slam.active && player.invuln <= 0.0f &&
+      overlap(player.box, slam.box)) {
+    hurtPlayer("slam wave — rest");
+  }
+
+  for (const Projectile& shot : projectiles) {
+    if (shot.alive && player.invuln <= 0.0f &&
+        overlap(player.box, shot.box)) {
+      hurtPlayer("ink blot — rest");
+      break;
+    }
   }
 
   if (touchingSpikes(level, player.box)) {

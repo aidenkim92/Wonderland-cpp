@@ -80,6 +80,20 @@ struct MovingPlatform {
   float maxX = 0;
 };
 
+struct Projectile {
+  bool alive = false;
+  AABB box{0, 0, 10, 10};
+  float vx = 0;
+  float vy = 0;
+  float life = 0;
+};
+
+struct SlamHazard {
+  bool active = false;
+  AABB box{0, 0, 80, 16};
+  float life = 0;
+};
+
 struct Sim {
   std::string assetsDir;
   Level level;
@@ -90,6 +104,8 @@ struct Sim {
   ExitDoor exitDoor;
   ShopStall shop;
   std::vector<MovingPlatform> platforms;
+  std::vector<Projectile> projectiles;
+  SlamHazard slam;
   ShopCatalog catalog;
   bool shopOpen = false;
   bool nearShop = false;
