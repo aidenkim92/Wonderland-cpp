@@ -58,7 +58,8 @@ Controls (keyboard): A/D or ←/→ move, Space/W/↑ jump. Gamepad later.
 4. **Slice 3** — shop catalog data, coins, stall UI (heal / damage tonic / extra heart).
 5. **Slice 4** — mid-boss grove (`grove_01`), Grove Brute state machine, stun-only vulnerability.
 6. **Slice 5** — crystal deep (`crystal_01`), moving platforms, combo geometry route after the brute.
-7. **Slice 6 (now)** — final atelier (`atelier_01`), Atelier Muse pattern boss (hop/slam/ink → open window).
+7. **Slice 6** — final atelier (`atelier_01`), Atelier Muse pattern boss (hop/slam/ink → open window).
+8. **Slice 7 (now)** — title screen, save/continue (`~/.wonderland_save.json`), autosave at lantern and room change.
 
 ## Level intent (field → deep)
 
@@ -75,6 +76,10 @@ Rooms are authored as data (`assets/levels/*.json`). Tile `#` = solid, `^` = spi
 ## Economy (slice 3)
 
 Few clear power-ups, not deep stat sheets. Start with 2 coins; blobs drop coins. Catalog in `assets/shop/catalog.json`: Honey bun (heal), Coral tonic (damage, once), Extra heart (max HP, once). Progress persists across room transitions.
+
+## Save (slice 7)
+
+Save file: `~/.wonderland_save.json`. Stores level, coins, HP/max, attack, shop unlocks, checkpoint flag. Autosave when a lantern is first lit and after a successful room transition. Manual: F5 save, F9 load. Title: New Game / Continue.
 
 ## Non-goals (v0)
 

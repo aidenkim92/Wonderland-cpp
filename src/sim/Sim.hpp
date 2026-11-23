@@ -3,6 +3,7 @@
 #include "sim/Boss.hpp"
 #include "sim/Geom.hpp"
 #include "sim/Level.hpp"
+#include "sim/Save.hpp"
 #include "sim/Shop.hpp"
 
 #include <string>
@@ -21,6 +22,8 @@ struct Input {
   bool uiConfirm2 = false;
   bool uiConfirm3 = false;
   bool uiClose = false;
+  bool savePressed = false;
+  bool loadPressed = false;
 };
 
 Input pollInput();
@@ -109,10 +112,13 @@ struct Sim {
   ShopCatalog catalog;
   bool shopOpen = false;
   bool nearShop = false;
+  bool saveRequested = false;
   float worldW = 640;
   float worldH = 288;
   std::string status;
   std::string pendingLevel;
+  std::string currentLevel = "meadow_01.json";
+  std::string savePath;
 
   bool loadCatalog(std::string& error);
   bool loadFromFile(const std::string& path, std::string& error);
@@ -120,6 +126,11 @@ struct Sim {
   void respawnPlayer();
   void fixedUpdate(float dt, const Input& input);
   bool tryBuy(std::size_t index);
+
+  SaveData captureSave() const;
+  void applySaveStats(const SaveData& data);
+  bool saveProgress(std::string& error);
+  bool loadProgress(std::string& error);
 
   AABB attackBox() const;
   bool playerAttacking() const { return player.attackActive > 0; }

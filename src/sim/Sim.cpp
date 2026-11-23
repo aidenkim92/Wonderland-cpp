@@ -146,6 +146,8 @@ Input pollInput() {
   in.uiConfirm2 = IsKeyPressed(KEY_TWO) || IsKeyPressed(KEY_KP_2);
   in.uiConfirm3 = IsKeyPressed(KEY_THREE) || IsKeyPressed(KEY_KP_3);
   in.uiClose = IsKeyPressed(KEY_ESCAPE);
+  in.savePressed = IsKeyPressed(KEY_F5);
+  in.loadPressed = IsKeyPressed(KEY_F9);
   return in;
 }
 
@@ -180,7 +182,69 @@ bool Sim::loadNamedLevel(const std::string& fileName, std::string& error) {
     error = "assetsDir not set";
     return false;
   }
-  return loadFromFile(assetsDir + "/levels/" + fileName, error);
+  if (!loadFromFile(assetsDir + "/levels/" + fileName, error)) {
+    return false;
+  }
+  currentLevel = fileName;
+  return true;
+}
+
+SaveData Sim::captureSave() const {
+  SaveData data;
+  data.level = currentLevel.empty() ? "meadow_01.json" : currentLevel;
+  data.coins = player.coins;
+  data.maxHp = player.maxHp;
+  data.hp = player.hp;
+  data.attackPower = player.attackPower;
+  data.boughtDamage = player.boughtDamage;
+  data.boughtHeart = player.boughtHeart;
+  data.checkpointActive = checkpoint.exists && checkpoint.active;
+  return data;
+}
+
+void Sim::applySaveStats(const SaveData& data) {
+  player.coins = data.coins;
+  player.maxHp = data.maxHp;
+  player.hp = std::clamp(data.hp, 1, data.maxHp);
+  player.attackPower = data.attackPower;
+  player.boughtDamage = data.boughtDamage;
+  player.boughtHeart = data.boughtHeart;
+}
+
+bool Sim::saveProgress(std::string& error) {
+  if (savePath.empty()) {
+    savePath = defaultSavePath();
+  }
+  if (!writeSave(savePath, captureSave(), error)) {
+    return false;
+  }
+  status = "saved";
+  saveRequested = false;
+  return true;
+}
+
+bool Sim::loadProgress(std::string& error) {
+  if (savePath.empty()) {
+    savePath = defaultSavePath();
+  }
+  SaveData data;
+  if (!readSave(savePath, data, error)) {
+    return false;
+  }
+  applySaveStats(data);
+  if (!loadNamedLevel(data.level, error)) {
+    return false;
+  }
+  applySaveStats(data);
+  if (data.checkpointActive && checkpoint.exists) {
+    checkpoint.active = true;
+    respawnPlayer();
+    checkpoint.active = true;
+    player.hp = std::clamp(data.hp, 1, player.maxHp);
+  }
+  shopOpen = false;
+  status = "loaded " + data.level;
+  return true;
 }
 
 bool Sim::loadFromFile(const std::string& path, std::string& error) {
@@ -350,6 +414,17 @@ bool Sim::tryBuy(std::size_t index) {
 
 void Sim::fixedUpdate(float dt, const Input& input) {
   if (!pendingLevel.empty()) {
+    return;
+  }
+
+  if (input.savePressed) {
+    saveRequested = true;
+  }
+  if (input.loadPressed) {
+    std::string error;
+    if (!loadProgress(error)) {
+      status = "load failed";
+    }
     return;
   }
 
@@ -608,12 +683,14 @@ void Sim::fixedUpdate(float dt, const Input& input) {
       checkpoint.active = true;
       player.hp = player.maxHp;
       status = "lantern lit — rest saved";
+      saveRequested = true;
     }
   }
 
   if (exitDoor.exists && overlap(player.box, exitDoor.box)) {
     if (exitDoor.locked) {
-      status = "door sealed until the brute falls";
+      status = boss.isMuse() ? "door sealed until the muse falls"
+                             : "door sealed until the brute falls";
     } else {
       pendingLevel = exitDoor.to;
       status = "entering " + exitDoor.to;

@@ -244,7 +244,7 @@ void drawFrame(const Sim& sim) {
              barX, 30, 14, Fade(BLACK, 0.55f));
   }
 
-  DrawText("Wonderland — slice 6", 16, 54, 18, Fade(BLACK, 0.55f));
+  DrawText("Wonderland — slice 7", 16, 54, 18, Fade(BLACK, 0.55f));
   if (sim.nearShop && !sim.shopOpen) {
     DrawText("E — open stall", 16, 74, 15, Fade(BLACK, 0.55f));
   } else if (sim.boss.present && sim.boss.alive && sim.boss.isMuse()) {
@@ -257,7 +257,7 @@ void drawFrame(const Sim& sim) {
     DrawText("Ride cyan pads · watch spikes · door on the high ledge", 16, 74,
              14, Fade(BLACK, 0.5f));
   } else {
-    DrawText("E shop · F/J attack · door travels", 16, 74, 15,
+    DrawText("F5 save · F9 load · E shop · door travels", 16, 74, 15,
              Fade(BLACK, 0.45f));
   }
   if (!sim.status.empty()) {
@@ -293,4 +293,26 @@ void drawFrame(const Sim& sim) {
   }
 }
 
+void drawTitle(bool hasSave) {
+  ClearBackground(kSkyMeadow);
+  DrawEllipse(200, 220, 180, 60, Fade(kGrassDark, 0.3f));
+  DrawEllipse(480, 240, 220, 70, Fade(kGrassDark, 0.25f));
+  DrawRectangle(0, 260, 640, 40, kGrassLight);
+  DrawRectangle(0, 270, 640, 30, kStone);
+
+  DrawText("Wonderland", 180, 70, 42, Fade(BLACK, 0.7f));
+  DrawText("a bright pixel adventure", 200, 120, 18, Fade(BLACK, 0.45f));
+
+  DrawRectangle(170, 160, 300, hasSave ? 100 : 70, Fade(kPanel, 0.95f));
+  DrawRectangleLines(170, 160, 300, hasSave ? 100 : 70, kPanelEdge);
+  DrawText("1 / Enter  New Game", 190, 175, 18, Fade(BLACK, 0.75f));
+  if (hasSave) {
+    DrawText("2 / C      Continue", 190, 205, 18, Fade(BLACK, 0.75f));
+    DrawText("Save found on this machine", 190, 235, 14, Fade(BLACK, 0.45f));
+  } else {
+    DrawText("No save yet — start fresh", 190, 205, 14, Fade(BLACK, 0.45f));
+  }
+}
+
 }  // namespace wonderland
+

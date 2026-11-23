@@ -34,6 +34,7 @@ add_executable(wonderland
   src/app/Game.cpp
   src/sim/Boss.cpp
   src/sim/Level.cpp
+  src/sim/Save.cpp
   src/sim/Shop.cpp
   src/sim/Sim.cpp
   src/render/Draw.cpp
